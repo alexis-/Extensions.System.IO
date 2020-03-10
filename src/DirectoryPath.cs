@@ -383,7 +383,7 @@ namespace Extensions.System.IO
     /// <param name="path">The path.</param>
     /// <returns>A <see cref="DirectoryPath" />.</returns>
     public static DirectoryPath FromString(string path) =>
-      path == null ? null : new DirectoryPath(path);
+      string.IsNullOrWhiteSpace(path) ? null : new DirectoryPath(path);
 
     /// <summary>
     ///   Performs an implicit conversion from <see cref="Uri" /> to
@@ -397,7 +397,7 @@ namespace Extensions.System.IO
     /// <param name="path">The path.</param>
     /// <returns>A <see cref="DirectoryPath" />.</returns>
     public static DirectoryPath FromUri(Uri path) =>
-      path == null ? null : new DirectoryPath(path);
+      string.IsNullOrWhiteSpace(path.LocalPath) ? null : new DirectoryPath(path);
 
     #endregion
   }

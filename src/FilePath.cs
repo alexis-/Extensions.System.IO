@@ -293,7 +293,7 @@ namespace Extensions.System.IO
     /// <param name="path">The path.</param>
     /// <returns>A <see cref="FilePath" />.</returns>
     public static FilePath FromString(string path) =>
-      path == null ? null : new FilePath(path);
+      string.IsNullOrWhiteSpace(path) ? null : new FilePath(path);
 
     /// <summary>Performs an implicit conversion from <see cref="Uri" /> to <see cref="FilePath" />.</summary>
     /// <param name="path">The path.</param>
@@ -304,7 +304,7 @@ namespace Extensions.System.IO
     /// <param name="path">The path.</param>
     /// <returns>A <see cref="FilePath" />.</returns>
     public static FilePath FromUri(Uri path) =>
-      path == null ? null : new FilePath(path);
+      string.IsNullOrWhiteSpace(path.LocalPath) ? null : new FilePath(path);
 
     #endregion
   }
