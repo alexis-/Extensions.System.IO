@@ -6,7 +6,7 @@
 // copy of this software and associated documentation files (the "Software"),
 // to deal in the Software without restriction, including without limitation
 // the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the 
+// and/or sell copies of the Software, and to permit persons to whom the
 // Software is furnished to do so, subject to the following conditions:
 // 
 // The above copyright notice and this permission notice shall be included in
@@ -21,8 +21,8 @@
 // DEALINGS IN THE SOFTWARE.
 // 
 // 
-// Created On:   2019/02/13 13:55
-// Modified On:  2019/02/13 14:15
+// Created On:   2020/03/29 00:20
+// Modified On:  2020/08/06 12:41
 // Modified By:  Alexis
 
 #endregion
@@ -30,14 +30,17 @@
 
 
 
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Security;
-using System.Security.Permissions;
-
 namespace Extensions.System.IO
 {
+  using global::System;
+  using global::System.IO;
+  using global::System.Linq;
+  using global::System.Runtime.InteropServices;
+  using global::System.Security.AccessControl;
+  using global::System.Security.Principal;
+  using Mono.Posix;
+  using Mono.Unix.Native;
+
   /// <summary>Represents a file path.</summary>
   /// https://github.com/Wyamio/Wyam/ Copyright (c) 2014 Dave Glick
   public sealed class FilePath : NormalizedPath
@@ -245,10 +248,10 @@ namespace Extensions.System.IO
     /// <returns>
     ///   <see langword="true" /> if the caller has the required permissions and file path
     ///   contains the name of an existing file; otherwise, <see langword="false" />. This method also
-    ///   returns <see langword="false" /> if file path is <see langword="null" />, an
-    ///   invalid path, or a zero-length string. If the caller does not have sufficient permissions to
-    ///   read the specified file, no exception is thrown and the method returns
-    ///   <see langword="false" /> regardless of the existence of file path.
+    ///   returns <see langword="false" /> if file path is <see langword="null" />, an invalid path,
+    ///   or a zero-length string. If the caller does not have sufficient permissions to read the
+    ///   specified file, no exception is thrown and the method returns <see langword="false" />
+    ///   regardless of the existence of file path.
     /// </returns>
     public bool Exists() => File.Exists(FullPath);
 
@@ -256,7 +259,7 @@ namespace Extensions.System.IO
     {
       try
       {
-        using (File.Open(FullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
+        using (File.Open(FullPath, global::System.IO.FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) { }
       }
       catch (IOException e)
       {
@@ -268,14 +271,38 @@ namespace Extensions.System.IO
       return false;
     }
 
-    public bool HasPermission(FileIOPermissionAccess permissionFlag)
+    public bool HasPermission(FileSystemRights permissionFlag)
     {
-      var permission    = new FileIOPermission(permissionFlag, FullPath);
-      var permissionSet = new PermissionSet(PermissionState.None);
+      //
+      // Windows
 
-      permissionSet.AddPermission(permission);
+      if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+      {
+        var fileInfo     = new FileInfo(FullPath);
+        var fileSecurity = fileInfo.GetAccessControl();
+        var usersSid     = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+        var rules        = fileSecurity.GetAccessRules(true, true, usersSid.GetType()).OfType<FileSystemAccessRule>();
 
-      return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+        return rules.Where(r => r.FileSystemRights.HasFlag(permissionFlag)).Any();
+      }
+
+      //
+      // Linux
+
+      AccessModes accessMode = 0;
+      
+      if (permissionFlag.HasFlag(FileSystemRights.Read))
+        accessMode |= AccessModes.R_OK;
+      
+      if (permissionFlag.HasFlag(FileSystemRights.Write))
+        accessMode |= AccessModes.W_OK;
+
+      if (permissionFlag.HasFlag(FileSystemRights.ExecuteFile))
+        accessMode |= AccessModes.X_OK;
+
+      var unixFileInfo = new Mono.Unix.UnixFileInfo(FullPath);
+
+      return unixFileInfo.CanAccess(accessMode);
     }
 
     /// <summary>
